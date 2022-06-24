@@ -5,7 +5,11 @@ from tqdm import tqdm_notebook
 
 from ..evaluate import Metrics
 from ..keras_utils.load_model import unpack_model
-from ..wavelet_denoising import wavelet_denoising_pysap
+try:    
+    from ..wavelet_denoising import wavelet_denoising_pysap
+    has_pysap = True
+except ImportError:
+    has_pysap = False
 
 
 def metrics_from_ds(ds, with_shape=True, name=None, **net_params):
@@ -13,17 +17,17 @@ def metrics_from_ds(ds, with_shape=True, name=None, **net_params):
     metrics = Metrics()
     pred_and_gt_shape = [
         (model.predict_on_batch(images_noisy), images_gt, im_shape)
-        for images_noisy, images_gt, im_shape in tqdm_notebook(ds)
+        for images_noisy, images_gt, im_shape in tqdm_notebook(ds.as_numpy_iterator())
     ]
     for im_recos, images, im_shape in tqdm_notebook(pred_and_gt_shape, desc=f'Stats for {name}'):
-        metrics.push(images.numpy(), im_recos.numpy(), im_shape.numpy())
+        metrics.push(images, im_recos, im_shape)
     return metrics
 
 def metrics_original_from_ds(ds, with_shape=True):
     metrics = Metrics()
     pred_and_gt_shape = [
-        (images_noisy.numpy(), images_gt.numpy(), im_shape.numpy())
-        for images_noisy, images_gt, im_shape in tqdm_notebook(ds)
+        (images_noisy, images_gt, im_shape)
+        for images_noisy, images_gt, im_shape in tqdm_notebook(ds.as_numpy_iterator())
     ]
     for im_recos, images, im_shape in tqdm_notebook(pred_and_gt_shape, desc='Stats for original noisy images'):
         metrics.push(images, im_recos, im_shape)

@@ -4,67 +4,68 @@ from tqdm import tqdm
 from learning_wavelets.config import CHECKPOINTS_DIR
 from learning_wavelets.data.datasets import im_dataset_bsd68
 from learning_wavelets.evaluate import METRIC_FUNCS, Metrics 
-from learning_wavelets.models.exact_recon_unet import ExactReconUnet
+from learning_wavelets.models.learnlet_model import Learnlet
 
 
-def evaluate_unet(
+tf.random.set_seed(1)
+
+def evaluate_Learnlet(
         noise_std_test=30,
-        run_id='ExactReconUnet_4_bsd500_0_55_None_1620201240',
+        run_id='Learnlet_16_5_dynamic_st_bsd500_0_55_2000_1620026248-200',
         n_epochs=500,
-        n_output_channels=1,
-        kernel_size=3,
-        base_n_filters=4, 
-        n_layers=4,
-        layers_n_non_lins=2,
-        non_linearity='relu',
+        n_tiling=16,
+        n_scales=5,
+        kernel_size=5,
         n_samples=None,
-        bn=False,
-        exact_recon=False,
-        residual=False,
     ):
     
     noise_std_test = force_list(noise_std_test)
-    layers_n_channels = [base_n_filters*2**j for j in range(0, n_layers)]
-    
+
     run_params = {
-        'n_output_channels': n_output_channels,
+    'denoising_activation': 'dynamic_soft_thresholding',
+    'learnlet_analysis_kwargs':{
+        'n_tiling': n_tiling, 
+        'mixing_details': False,    
+        'skip_connection': True,
         'kernel_size': kernel_size,
-        'layers_n_channels': layers_n_channels,
-        'layers_n_non_lins': layers_n_non_lins,
-        'non_linearity': non_linearity,
-        'bn': bn,
-        'exact_recon': exact_recon,
-        'residual': residual,
+    },
+    'learnlet_synthesis_kwargs': {
+        'res': True,
+        'kernel_size': kernel_size,
+    },
+    'threshold_kwargs':{
+        'noise_std_norm': True,
+    },
+#     'wav_type': 'bior',
+    'n_scales': n_scales,
+    'n_reweights_learn': 3,
+    'clip': False,
     }
-    
-    model = ExactReconUnet(**run_params)
-    
+
+    model = Learnlet(**run_params)
+
     inputs = [tf.zeros((1, 32, 32, 1)), tf.zeros((1, 1))]
     model(inputs)
-        
     model.load_weights(f'{CHECKPOINTS_DIR}checkpoints/{run_id}-{n_epochs}.hdf5')
     
     metrics_per_noise_level = {}
-    
+
     for noise_level in noise_std_test:
         val_set = im_dataset_bsd68(
             mode='testing',
             patch_size=None,
             noise_std=noise_level,
-            n_pooling=5,
             return_noise_level=True,
             n_samples=n_samples,
         )
-    
-        
-        eval_res = Metrics()
-        for x, y_true, im_shape in tqdm(val_set.as_numpy_iterator()):
-            y_pred = model.predict(x)
-            eval_res.push(y_true, y_pred, im_shape=im_shape)
-        metrics_per_noise_level[noise_level] = (list(eval_res.means().values()), list(eval_res.stddevs().values()))
-        
-    return METRIC_FUNCS, metrics_per_noise_level
 
+        eval_res = Metrics()
+        for x, y_true, size in tqdm(val_set.as_numpy_iterator()):
+            y_pred = model.predict(x)
+            eval_res.push(y_true, y_pred)
+        metrics_per_noise_level[noise_level] = (list(eval_res.means().values()), list(eval_res.stddevs().values()))
+
+    return METRIC_FUNCS, metrics_per_noise_level
 
 def force_list(x):
     if not isinstance(x, list):

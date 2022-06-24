@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow.keras.models import Model
 
-from ..keras_utils import DynamicSoftThresholding, DynamicHardThresholding
-from .learnlet_layers import LearnletAnalysis, LearnletSynthesis, ScalesThreshold
+from learning_wavelets.keras_utils import DynamicSoftThresholding, DynamicHardThresholding
+from learning_wavelets.learnlet_layers import LearnletAnalysis, LearnletSynthesis, ScalesThreshold
 
 class Learnlet(Model):
     __name__ = 'learnlet'

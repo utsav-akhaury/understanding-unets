@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from tkinter.tix import Tree
 
 import numpy as np
 import scipy.ndimage as ndimage
@@ -14,7 +13,6 @@ def normalise(image):
 # data augmentation
 def random_rotate_flip_image(image):
     # in numpy
-
     rot_coef = np.random.randint(4, size=1)[0]  # 0-3
     flip_coef = np.random.randint(2, size=1)[0]  # 0-1
 
@@ -33,12 +31,13 @@ def tf_random_rotate_flip_image(image):
     return image
 
 # patch selection
-def select_patch_in_image_function(patch_size):
+def select_patch_in_image_function(patch_size, seed=0):
     def select_patch_in_image(image):
         if patch_size is not None:
             patch = tf.image.random_crop(
                 image,
                 [patch_size, patch_size, 1],
+                seed=seed,
             )
             return patch
         else:
@@ -162,7 +161,7 @@ def im_dataset(
     if patch_size is not None:
         select_patch_in_image = select_patch_in_image_function(patch_size)
         image_patch_ds = image_grey_ds.map(
-            select_patch_in_image, num_parallel_calls=tf.data.experimental.AUTOTUNE,
+            select_patch_in_image, num_parallel_calls=tf.data.experimental.AUTOTUNE
         )
     elif n_pooling is not None:
         pad = pad_for_pool(n_pooling, return_original_shape=mode=='testing')
@@ -171,9 +170,6 @@ def im_dataset(
         )
     else:
         image_patch_ds = image_grey_ds
-
-    print('Image patch_ds - ', image_patch_ds)
-
     add_noise = add_noise_function(
         noise_std,
         return_noise_level=return_noise_level,
@@ -202,13 +198,7 @@ def im_dataset(
                 lambda patch: (add_noise(patch), patch, tf.shape(patch)[:2]),
                 num_parallel_calls=tf.data.experimental.AUTOTUNE,
             )
-            
-    print('Image noisy_ds - ', image_noisy_ds)
-
     image_noisy_ds = image_noisy_ds.batch(batch_size)
     if mode != 'testing':
         image_noisy_ds = image_noisy_ds.repeat().prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-
-    print('Image noisy_ds (batch) - ', image_noisy_ds)
-
     return image_noisy_ds

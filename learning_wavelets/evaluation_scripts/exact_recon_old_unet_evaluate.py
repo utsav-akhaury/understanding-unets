@@ -5,7 +5,7 @@ from tqdm import tqdm
 from learning_wavelets.config import CHECKPOINTS_DIR
 from learning_wavelets.data.datasets import im_dataset_bsd68
 from learning_wavelets.evaluate import METRIC_FUNCS, Metrics 
-from learning_wavelets.models.unet import unet
+from learning_wavelets.models.exact_recon_old_unet import exact_recon_old_unet
 
 
 tf.random.set_seed(1)
@@ -19,7 +19,7 @@ def evaluate_old_unet(
         n_layers=5,
         layers_n_non_lins=2,
         n_samples=None,
-        bn=False,
+        exact_recon=False,
     ):
     
     noise_std_test = force_list(noise_std_test)
@@ -30,13 +30,14 @@ def evaluate_old_unet(
         "layers_n_channels": [base_n_filters * 2**i for i in range(0, n_layers)],
         'layers_n_non_lins': layers_n_non_lins,
         'non_relu_contract': False,
-        'bn': bn,
+        'bn': True,
+        'exact_recon': exact_recon,
     }
     
     n_channels = 1
-    model = unet(input_size=(None, None, n_channels), **run_params)
+    model = exact_recon_old_unet(input_size=(None, None, n_channels), **run_params)
 
-    model.load_weights(f'{CHECKPOINTS_DIR}checkpoints/{run_id}-{n_epochs}.hdf5')
+    model.load_weights(f'{CHECKPOINTS_DIR}checkpoints/{run_id}-{n_epochs}.tf')
 
     metrics_per_noise_level = {}
     
@@ -46,14 +47,14 @@ def evaluate_old_unet(
             patch_size=None,
             noise_std=noise_level,
             n_pooling=5,
-            return_noise_level=False,
+            return_noise_level=True,
             n_samples=n_samples,
         )
     
         
         eval_res = Metrics()
         for x, y_true, im_shape in tqdm(val_set.as_numpy_iterator()):
-            y_pred = model.predict_on_batch(x)
+            y_pred = model.predict(x)
             eval_res.push(y_true, y_pred, im_shape=im_shape)
         metrics_per_noise_level[noise_level] = (list(eval_res.means().values()), list(eval_res.stddevs().values()))
 

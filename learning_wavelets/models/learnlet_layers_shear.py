@@ -4,8 +4,8 @@ import tensorflow.keras.backend as K
 from tensorflow.keras.constraints import UnitNorm
 from tensorflow.keras.layers import Layer, Activation, Conv2D, Concatenate
 
-from learning_wavelets.keras_utils import Normalisation, DynamicSoftThresholding, DynamicHardThresholding, CheekyDynamicHardThresholding, FixedPointPooling, FixedPointUpSampling, BiorUpSampling
-from learning_wavelets.utils.wav_utils import get_wavelet_filters_normalisation
+from ..keras_utils import Normalisation, DynamicSoftThresholding, DynamicHardThresholding, CheekyDynamicHardThresholding, FixedPointPooling, FixedPointUpSampling, BiorUpSampling
+from ..utils.wav_utils import get_wavelet_filters_normalisation
 
 
 h_filter_bior = [
@@ -124,6 +124,7 @@ class LearnletAnalysis(Layer):
             n_scales=4,
             kernel_size=5,
             skip_connection=False,
+            n_shearlets=85,
             **wav_analysis_kwargs,
         ):
         super(LearnletAnalysis, self).__init__()
@@ -135,13 +136,27 @@ class LearnletAnalysis(Layer):
         self.kernel_size = kernel_size
         self.skip_connection = skip_connection
         self.wav_analysis = WavAnalysis(coarse=True, n_scales=self.n_scales, **wav_analysis_kwargs)
+        self.n_shearlets = n_shearlets
         constraint = None
         if self.tiling_unit_norm:
             constraint = UnitNorm(axis=[0, 1, 2])
         tiling_prefix = 'details_tiling'
-        self.convs_detail_tiling = [
+        self.convs_detail_tiling_fixed = [
             Conv2D(
-                n_tiling,
+                self.n_shearlets,
+                self.kernel_size,
+                activation='linear',
+                padding='same',
+                kernel_initializer='glorot_uniform',
+                use_bias=tiling_use_bias,
+                kernel_constraint=None, 
+                trainable=False,
+                name=f'{tiling_prefix}_fixed_{str(K.get_uid(tiling_prefix))}',
+            ) for i in range(self.n_scales)
+        ]
+        self.convs_detail_tiling_train = [
+            Conv2D(
+                self.n_tiling - self.n_shearlets,
                 self.kernel_size,
                 activation='linear',
                 padding='same',
@@ -151,9 +166,10 @@ class LearnletAnalysis(Layer):
                 name=f'{tiling_prefix}_{str(K.get_uid(tiling_prefix))}',
             ) for i in range(self.n_scales)
         ]
+
         if self.mixing_details:
             mixing_prefix = 'details_mixing'
-            self.convs_detail_mixing = [
+            self.convs_detail_mixing_fixed = [
                 Conv2D(
                     n_tiling,
                     self.kernel_size,
@@ -172,7 +188,9 @@ class LearnletAnalysis(Layer):
         wav_coarse = wav_coeffs[-1]
         outputs_list = []
         for i_scale, wav_detail in enumerate(wav_details):
-            details_tiled = self.convs_detail_tiling[i_scale](wav_detail)
+            details_tiled_fixed = self.convs_detail_tiling_fixed[i_scale](wav_detail)
+            details_tiled_train = self.convs_detail_tiling_train[i_scale](wav_detail)
+            details_tiled = tf.concat([details_tiled_fixed, details_tiled_train], axis=-1)
             if self.mixing_details:
                 details_tiled = self.convs_detail_mixing[i_scale](details_tiled)
             if self.skip_connection:
@@ -184,7 +202,9 @@ class LearnletAnalysis(Layer):
     def tiling(self, wav_thresholded_details):
         outputs_list = []
         for i_scale, wav_thresholded_detail in enumerate(wav_thresholded_details):
-            thresholded_details_tiled = self.convs_detail_tiling[i_scale](wav_thresholded_detail)
+            thresholded_details_tiled_fixed = self.convs_detail_tiling_fixed[i_scale](wav_thresholded_detail)
+            thresholded_details_tiled_train = self.convs_detail_tiling_train[i_scale](wav_thresholded_detail)
+            thresholded_details_tiled = tf.concat([thresholded_details_tiled_fixed, thresholded_details_tiled_train], axis=-1)
             outputs_list.append(thresholded_details_tiled)
         return outputs_list
 
@@ -203,7 +223,7 @@ class LearnletAnalysis(Layer):
 
 class LearnletSynthesis(Layer):
     __name__ = 'learnlet_synthesis'
-    def __init__(self, normalize=True, n_scales=4, n_channels=1, synthesis_use_bias=False, synthesis_norm=False, res=False, kernel_size=5, wav_type='starlet'):
+    def __init__(self, normalize=True, n_scales=4, n_tiling=256, n_channels=1, synthesis_use_bias=False, synthesis_norm=False, res=False, kernel_size=5, wav_type='starlet', n_shearlets=85):
         super(LearnletSynthesis, self).__init__()
         self.normalize = normalize
         self.n_scales = n_scales
@@ -213,6 +233,8 @@ class LearnletSynthesis(Layer):
         self.res = res
         self.kernel_size = kernel_size
         self.wav_type = wav_type
+        self.n_tiling = n_tiling
+        self.n_shearlets = n_shearlets
         if self.normalize:
             self.wav_filters_norm = get_wavelet_filters_normalisation(self.n_scales, wav_type=self.wav_type)
             self.wav_filters_norm.reverse()
@@ -226,7 +248,21 @@ class LearnletSynthesis(Layer):
         if self.synthesis_norm:
             constraint = UnitNorm(axis=[0, 1, 2])
         groupping_prefix = 'groupping_conv'
-        self.convs_groupping = [
+        self.convs_groupping_fixed = [
+            Conv2D(
+                n_channels,
+                self.kernel_size,
+                activation='linear',
+                padding='same',
+                kernel_initializer='glorot_uniform',
+                use_bias=synthesis_use_bias,
+                kernel_constraint=None,
+                trainable=False,
+                name=f'{groupping_prefix}_fixed_{str(K.get_uid(groupping_prefix))}',
+            ) for i in range(self.n_scales)
+        ]
+
+        self.convs_groupping_train = [
             Conv2D(
                 n_channels,
                 self.kernel_size,
@@ -250,7 +286,8 @@ class LearnletSynthesis(Layer):
                 wav_norm = self.wav_filters_norm[i_scale]
                 detail = detail * wav_norm
             if self.res:
-                image = self.convs_groupping[i_scale](detail) + image
+                image = self.convs_groupping_fixed[i_scale](detail[...,0:self.n_shearlets]) + image
+                image = self.convs_groupping_train[i_scale](detail[...,self.n_shearlets:self.n_tiling]) + image
             else:
                 image = self.convs_groupping[i_scale](tf.concat([image, detail], axis=-1))
         return image
@@ -270,7 +307,8 @@ class LearnletSynthesis(Layer):
                 wav_coeff_thresholded = wav_coeff_thresholded * wav_norm
                 wav_coeff_thresholded_tiled = wav_coeff_thresholded_tiled * wav_norm
             if self.res:
-                image = self.convs_groupping[i_scale](detail - wav_coeff_thresholded_tiled) + wav_coeff_thresholded + image
+                image = self.convs_groupping_fixed[i_scale](detail[0:self.n_shearlets] - wav_coeff_thresholded_tiled[0:self.n_shearlets]) + wav_coeff_thresholded[0:self.n_shearlets] + image
+                image = self.convs_groupping_train[i_scale](detail[self.n_shearlets:self.n_tiling] - wav_coeff_thresholded_tiled[self.n_shearlets:self.n_tiling]) + wav_coeff_thresholded[self.n_shearlets:self.n_tiling] + image
         return image
 
     def get_config(self):

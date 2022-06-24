@@ -74,7 +74,7 @@ def unet_rec(
     return output
 
 
-def unet(
+def exact_recon_old_unet(
         input_size=(256, 256, 1),
         kernel_size=3,
         n_layers=1,
@@ -84,6 +84,7 @@ def unet(
         pool='max',
         lr=1e-3,
         bn=False,
+        exact_recon=False,
     ):
     if isinstance(layers_n_channels, int):
         layers_n_channels = [layers_n_channels] * n_layers
@@ -93,9 +94,13 @@ def unet(
         layers_n_non_lins = [layers_n_non_lins] * n_layers
     else:
         assert len(layers_n_non_lins) == n_layers
-    inputs = Input(input_size)
+    noisy_image = Input(input_size)
+    noise_std = Input((1))
+    #noisy_image = inputs[0]
+    #noise_std = inputs[1]
+    output = noisy_image
     output = unet_rec(
-        inputs,
+        output,
         kernel_size=kernel_size,
         n_layers=n_layers,
         layers_n_channels=layers_n_channels,
@@ -118,7 +123,11 @@ def unet(
         padding='same',
         kernel_initializer='glorot_uniform',
     )(output)
-    model = Model(inputs=inputs, outputs=output)
+    noise_std_ = tf.reshape(noise_std, shape=[tf.shape(noise_std)[0], 1, 1, 1])
+    if exact_recon:
+        output = noisy_image - noise_std_ * output
+
+    model = Model(inputs=(noisy_image, noise_std), outputs=output)
     model.compile(
         optimizer=Adam(lr=lr, clipnorm=1.),
         loss='mean_squared_error',
