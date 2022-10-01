@@ -8,14 +8,14 @@ import tensorflow as tf
 
 from learning_wavelets.config import LOGS_DIR, CHECKPOINTS_DIR
 from learning_wavelets.data.datasets import im_dataset_div2k, im_dataset_bsd500
-from learning_wavelets.models.bias_free_unet import unet
+from learning_wavelets.models.unet import unet
 from learning_wavelets.models.exact_recon_old_unet import exact_recon_old_unet
 from learning_wavelets.data.datasets import transform_dataset_unet
 
 
 tf.random.set_seed(1)
 
-def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5):
+def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_bias=False):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(cuda_visible_devices)
 
@@ -26,7 +26,8 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5):
         "layers_n_channels": [base_n_filters * 2**i for i in range(0, n_layers)],
         'layers_n_non_lins': 2,
         'non_relu_contract': False,
-        'bn': True,
+        'bn': True
+        'use_bias': use_bias,
     }
 
 
@@ -106,10 +107,6 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5):
     )
 
     n_channels = 1
-    # run distributed
-    # mirrored_strategy = tf.distribute.MirroredStrategy()
-    # with mirrored_strategy.scope():
-    #     model = unet(input_size=(None, None, n_channels), lr=1e-3, **run_params)
     model = unet(input_size=(None, None, n_channels), lr=1e-3, **run_params)
     print(model.summary(line_length=114))
 
@@ -129,8 +126,8 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5):
     print('\nTraining Complete, Time Taken =', t1-t0, flush=True)
 
 
-# if __name__ == '__main__':
-#     train_unet()
+if __name__ == '__main__':
+    train_unet()
 
 
 def train_old_unet(cuda_visible_devices='0123',
@@ -138,6 +135,7 @@ def train_old_unet(cuda_visible_devices='0123',
         base_n_filters=128, 
         n_layers=5, 
         exact_recon=False,
+        use_bias=False,
     ):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(cuda_visible_devices)
@@ -149,7 +147,8 @@ def train_old_unet(cuda_visible_devices='0123',
         'layers_n_non_lins': layers_n_non_lins,
         'non_relu_contract': False,
         'bn': False,
-        'exact_recon': exact_recon,
+        'exact_recon': exact_recon
+        'use_bias': use_bias,
     }
 
     batch_size = 32
@@ -239,5 +238,5 @@ def train_old_unet(cuda_visible_devices='0123',
     # return run_id
 
 
-if __name__ == '__main__':
-    train_old_unet()
+# if __name__ == '__main__':
+#     train_old_unet()

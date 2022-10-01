@@ -15,7 +15,8 @@ def unet_rec(
         layers_n_non_lins=1,
         pool='max',
         non_relu_contract=False,
-        bn=False,
+        bn=False
+        use_bias=False,
     ):
     if n_layers == 1:
         last_conv = chained_convolutions(
@@ -62,6 +63,7 @@ def unet_rec(
                 kernel_size - 1,
                 activation='relu',
                 padding='same',
+                use_bias=use_bias,
                 kernel_initializer='glorot_uniform',
             )(UpSampling2D(size=(2, 2))(rec_output))  # up-conv
         ], axis=3)
@@ -109,6 +111,7 @@ def unet(
         1,
         activation='linear',
         padding='same',
+        use_bias=use_bias,
         kernel_initializer='glorot_uniform',
     )(output)
     output = Conv2D(
@@ -116,6 +119,7 @@ def unet(
         1,
         activation='linear',
         padding='same',
+        use_bias=use_bias,
         kernel_initializer='glorot_uniform',
     )(output)
     model = Model(inputs=inputs, outputs=output)
@@ -136,6 +140,7 @@ def chained_convolutions(inputs, n_channels=1, n_non_lins=1, kernel_size=3, acti
             kernel_size,
             activation=activation,
             padding='same',
+            use_bias=use_bias,
             kernel_initializer='glorot_uniform',
         )(conv)
         if bn:
