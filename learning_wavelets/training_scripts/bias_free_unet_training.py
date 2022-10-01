@@ -8,22 +8,22 @@ import tensorflow as tf
 
 from learning_wavelets.config import LOGS_DIR, CHECKPOINTS_DIR
 from learning_wavelets.data.datasets import im_dataset_div2k, im_dataset_bsd500
-from learning_wavelets.models.unet import unet
+from learning_wavelets.models.bias_free_unet import unet
 from learning_wavelets.models.exact_recon_old_unet import exact_recon_old_unet
 from learning_wavelets.data.datasets import transform_dataset_unet
 
 
 tf.random.set_seed(1)
 
-def train_unet(cuda_visible_devices='0123', base_n_filters=64):
+def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5):
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(cuda_visible_devices)
 
     # model definition
     run_params = {
-        'n_layers': 5,
+        'n_layers': n_layers,
         'pool': 'max',
-        "layers_n_channels": [base_n_filters * 2**i for i in range(5)],
+        "layers_n_channels": [base_n_filters * 2**i for i in range(0, n_layers)],
         'layers_n_non_lins': 2,
         'non_relu_contract': False,
         'bn': True,
@@ -82,8 +82,8 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64):
     steps_per_epoch = np.shape(x_train)[0] // batch_size
 
 
-    n_epochs = 100
-    run_id = f'unet_{base_n_filters}_dynamic_st_{int(time.time())}'
+    n_epochs = 500
+    run_id = f'unet_{base_n_filters}_bias_free_{int(time.time())}'
     CHECKPOINTS_DIR = data_dir+'Trained_Models/Unet/Checkpoints/'
     chkpt_path = f'{CHECKPOINTS_DIR}/{run_id}' + '-{epoch:02d}.hdf5'
     print(run_id)
@@ -161,34 +161,24 @@ def train_old_unet(cuda_visible_devices='0123',
         x_train = np.load(data_dir+'x_train.npy')
         y_train = np.load(data_dir+'y_train.npy')
 
-    noise_sigma_orig = 0.0016
+    # noise_sigma_orig = 0.0016
 
-    # Normalisation
-    def norm(arr):  
-        bias = np.mean(arr, axis=(1,2), keepdims=True) #np.min(arr, axis=(1,2), keepdims=True)
-        norm_fact = np.std(arr, axis=(1,2), keepdims=True) #np.max(arr, axis=(1,2), keepdims=True) - np.min(arr, axis=(1,2), keepdims=True)
-        return ((arr - bias)/norm_fact), norm_fact[:,:,0,0]
-
-    def norm2(arr):
-        return arr / np.max(arr, axis=(1,2), keepdims=True)
-
-    peak_scale_fact_tikho = ((np.max(x_train, axis=(1,2), keepdims=True) - np.min(x_train, axis=(1,2), keepdims=True)) / 
-                             (np.max(y_train, axis=(1,2), keepdims=True) - np.min(y_train, axis=(1,2), keepdims=True)))
-
-    # Normalize & scale tikho inputs
-    x_train, noise_scale_fact = norm(x_train)
-    x_train = norm2(x_train)
-    x_train *= peak_scale_fact_tikho
-
-    # Scale noisy sigma
-    # noise_sigma_new = noise_sigma_orig / (noise_scale_fact / peak_scale_fact_tikho[:,:,0,0])
 
     # Normalize targets
-    y_train, _ = norm(y_train)
-    y_train = norm2(y_train)
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
+    y_train /= norm_fact
+
+    # Normalize & scale tikho inputs
+    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    x_train /= norm_fact
+
+    # # Scale noisy sigma
+    # noise_sigma_new = noise_sigma_orig / norm_fact
 
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))#.map(lambda x: x, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset_unet,

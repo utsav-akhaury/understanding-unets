@@ -1,10 +1,10 @@
-import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
 from learning_wavelets.config import CHECKPOINTS_DIR
 from learning_wavelets.data.datasets import im_dataset_bsd68
 from learning_wavelets.evaluate import METRIC_FUNCS, Metrics 
+from learning_wavelets.models.unet import unet
 from learning_wavelets.models.exact_recon_old_unet import exact_recon_old_unet
 
 
@@ -37,7 +37,7 @@ def evaluate_old_unet(
     n_channels = 1
     model = exact_recon_old_unet(input_size=(None, None, n_channels), **run_params)
 
-    model.load_weights(f'{CHECKPOINTS_DIR}checkpoints/{run_id}-{n_epochs}.tf')
+    model.load_weights(f'{CHECKPOINTS_DIR}checkpoints/{run_id}-{n_epochs}.hdf5')
 
     metrics_per_noise_level = {}
     

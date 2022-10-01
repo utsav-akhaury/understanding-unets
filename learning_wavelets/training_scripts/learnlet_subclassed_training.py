@@ -17,7 +17,7 @@ tf.random.set_seed(1)
 def train_learnlet(
         cuda_visible_devices='0123',
         denoising_activation='dynamic_soft_thresholding',
-        n_filters=256,
+        n_filters=256,  
         exact_reco=True,
         n_reweights=1,
     ):
@@ -38,7 +38,7 @@ def train_learnlet(
         'threshold_kwargs':{
             'noise_std_norm': True,
         },
-        'n_scales': 5,
+        'n_scales': 5,    # try: 7
         'n_reweights_learn': n_reweights,
         'exact_reconstruction': exact_reco,
         'clip': False,
@@ -49,29 +49,29 @@ def train_learnlet(
 
     data_dir = '/home/users/a/akhaury/scratch/SingleChannel_Deconv/'
 
-    # Read Saved Batches   
-    x_train = np.load(data_dir+'x_train.npy')
-    y_train = np.load(data_dir+'y_train.npy')
+    # Read Saved Batches  
+    with tf.device('/CPU:0'): 
+        x_train = np.load(data_dir+'x_train.npy')
+        y_train = np.load(data_dir+'y_train.npy')
 
     noise_sigma_orig = 0.0016
 
-    # normalisation
-    def norm(arr):  
-        bias = np.min(arr, axis=(1,2), keepdims=True)
-        norm_fact = np.max(arr, axis=(1,2), keepdims=True) - np.min(arr, axis=(1,2), keepdims=True)
-        return (((arr - bias)/norm_fact) - 0.5), norm_fact[:,:,0,0]
 
-    peak_scale_fact = np.max(x_train, axis=(1,2), keepdims=True) / np.max(y_train, axis=(1,2), keepdims=True)
-    
-    x_train, noise_scale_fact = norm(x_train)
-    x_train *= peak_scale_fact
+    # Normalize targets
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
+    y_train /= norm_fact
 
-    noise_sigma_new = noise_sigma_orig / noise_scale_fact
+    # Normalize & scale tikho inputs
+    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    x_train /= norm_fact
 
-    y_train, _ = norm(y_train)
+    # Scale noisy sigma
+    noise_sigma_new = noise_sigma_orig / norm_fact
 
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train, noise_sigma_new))#.map(lambda x: x, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train, noise_sigma_new))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset,
@@ -87,7 +87,7 @@ def train_learnlet(
     steps_per_epoch = np.shape(x_train)[0] // batch_size
 
 
-    n_epochs = 100
+    n_epochs = 2 #500
     undecimated_str = '' 
     if exact_reco:
         undecimated_str += '_exact_reco'
@@ -123,6 +123,12 @@ def train_learnlet(
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         model = Learnlet(**run_params)
+
+        # # Load Saved Model (if training needs to be resumed)
+        # inputs = [tf.zeros((1, 32, 32, 1)), tf.zeros((1, 1))]
+        # model(inputs)
+        # model.load_weights(f'{CHECKPOINTS_DIR}/learnlet_subclassed_256__exact_reco_dynamic_soft_thresholding_1657446701-20.hdf5')
+
         model.compile(
             optimizer=Adam(lr=1e-3),
             loss='mse',

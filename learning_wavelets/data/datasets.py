@@ -248,3 +248,37 @@ def transform_dataset(x_train, y_train, noise_sigma_new):
         x_train, y_train, noise_sigma_new = tf_augmentation(x_train, y_train, noise_sigma_new)
 
         return (x_train, noise_sigma_new), y_train
+
+
+def transform_dataset_unet(x_train, y_train):
+
+        def augmentation(im1, im2):
+            a = np.random.choice([0,1,2,3])
+            if a==0:
+                return im1, im2
+            elif a==1:
+                ch = np.random.choice([1, 2, 3])
+                return np.rot90(im1, ch), np.rot90(im2, ch)
+            elif a==2:
+                ch = np.random.choice([0, 1])
+                return np.flip(im1, axis=ch), np.flip(im2, axis=ch)
+            elif a==3:
+                ch1 = np.random.choice([10, -10])
+                ch2 = np.random.choice([0, 1])
+                return np.roll(im1, ch1, axis=ch2), np.roll(im2, ch1, axis=ch2)
+
+        def tf_augmentation(im1, im2):
+            # in tf
+            im1_shape = im1.shape
+            im2_shape = im2.shape
+
+            [im1, im2,] = tf.py_function(augmentation, [im1, im2], [tf.float32, tf.float32])
+
+            im1.set_shape(im1_shape)
+            im2.set_shape(im2_shape)
+
+            return im1, im2
+
+        x_train, y_train = tf_augmentation(x_train, y_train)
+
+        return x_train, y_train
