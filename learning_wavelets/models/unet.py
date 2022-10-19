@@ -15,7 +15,7 @@ def unet_rec(
         layers_n_non_lins=1,
         pool='max',
         non_relu_contract=False,
-        bn=False
+        bn=False,
         use_bias=False,
     ):
     if n_layers == 1:
@@ -86,6 +86,7 @@ def unet(
         pool='max',
         lr=1e-3,
         bn=False,
+        use_bias=False,
     ):
     if isinstance(layers_n_channels, int):
         layers_n_channels = [layers_n_channels] * n_layers
@@ -132,7 +133,7 @@ def unet(
     return model
 
 
-def chained_convolutions(inputs, n_channels=1, n_non_lins=1, kernel_size=3, activation='relu', bn=False):
+def chained_convolutions(inputs, n_channels=1, n_non_lins=1, kernel_size=3, activation='relu', bn=False, use_bias=False):
     conv = inputs
     for _ in range(n_non_lins):
         conv = Conv2D(

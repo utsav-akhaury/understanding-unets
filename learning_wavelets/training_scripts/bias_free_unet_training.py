@@ -26,7 +26,7 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_b
         "layers_n_channels": [base_n_filters * 2**i for i in range(0, n_layers)],
         'layers_n_non_lins': 2,
         'non_relu_contract': False,
-        'bn': True
+        'bn': True,
         'use_bias': use_bias,
     }
 
@@ -37,37 +37,21 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_b
 
     # Read Saved Batches   
     with tf.device('/CPU:0'):
-        x_train = np.load(data_dir+'x_train.npy')
-        y_train = np.load(data_dir+'y_train.npy')
+        x_train = np.load(data_dir+'x_train_gen.npy')
+        y_train = np.load(data_dir+'y_train_gen.npy')
 
-    noise_sigma_orig = 0.0016
-
-    # Normalisation
-    def norm(arr):  
-        bias = np.mean(arr, axis=(1,2), keepdims=True) #np.min(arr, axis=(1,2), keepdims=True)
-        norm_fact = np.std(arr, axis=(1,2), keepdims=True) #np.max(arr, axis=(1,2), keepdims=True) - np.min(arr, axis=(1,2), keepdims=True)
-        return ((arr - bias)/norm_fact), norm_fact[:,:,0,0]
-
-    def norm2(arr):
-        return arr / np.max(arr, axis=(1,2), keepdims=True)
-
-    peak_scale_fact_tikho = ((np.max(x_train, axis=(1,2), keepdims=True) - np.min(x_train, axis=(1,2), keepdims=True)) / 
-                             (np.max(y_train, axis=(1,2), keepdims=True) - np.min(y_train, axis=(1,2), keepdims=True)))
-
-    # Normalize & scale tikho inputs
-    x_train, noise_scale_fact = norm(x_train)
-    x_train = norm2(x_train)
-    x_train *= peak_scale_fact_tikho
-
-    # Scale noisy sigma
-    # noise_sigma_new = noise_sigma_orig / (noise_scale_fact / peak_scale_fact_tikho[:,:,0,0])
 
     # Normalize targets
-    y_train, _ = norm(y_train)
-    y_train = norm2(y_train)
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
+    y_train /= norm_fact
+
+    # Normalize & scale tikho inputs
+    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    x_train /= norm_fact
 
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))#.map(lambda x: x, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset_unet,
@@ -132,7 +116,7 @@ if __name__ == '__main__':
 
 def train_old_unet(cuda_visible_devices='0123',
         layers_n_non_lins=2,
-        base_n_filters=128, 
+        base_n_filters=64, 
         n_layers=5, 
         exact_recon=False,
         use_bias=False,
@@ -147,7 +131,7 @@ def train_old_unet(cuda_visible_devices='0123',
         'layers_n_non_lins': layers_n_non_lins,
         'non_relu_contract': False,
         'bn': False,
-        'exact_recon': exact_recon
+        'exact_recon': exact_recon,
         'use_bias': use_bias,
     }
 
@@ -173,7 +157,7 @@ def train_old_unet(cuda_visible_devices='0123',
     x_train /= norm_fact
 
     # # Scale noisy sigma
-    # noise_sigma_new = noise_sigma_orig / norm_fact
+    # noise_sigma_new = noise_sigma_orig / norm_fact[:,:,0,0]
 
 
 
@@ -236,7 +220,3 @@ def train_old_unet(cuda_visible_devices='0123',
     print('\nTraining Complete, Time Taken =', t1-t0, flush=True)
     
     # return run_id
-
-
-# if __name__ == '__main__':
-#     train_old_unet()

@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=unet     # nom du job
+#SBATCH --job-name=unet_64     # nom du job
 #SBATCH --gpus 1
-#SBATCH --partition shared-gpu
-#SBATCH --mem 0
-#SBATCH --time=0-08:00:00              # temps d’exécution maximum demande (HH:MM:SS)
-#SBATCH --output=unet_%j.out # nom du fichier de sortie
-#SBATCH --error=unet_%j.out  # nom du fichier d'erreur (ici commun avec la sortie)
+#SBATCH --partition public-gpu
+#SBATCH --mem=10000
+#SBATCH --time=0-18:00:00              # temps d’exécution maximum demande (HH:MM:SS)
+#SBATCH --output=unet_64_500_%j.out # nom du fichier de sortie
+#SBATCH --error=unet_64_500_%j.out  # nom du fichier d'erreur (ici commun avec la sortie)
 
 set -x
 cd $HOME/Thesis/understanding-unets

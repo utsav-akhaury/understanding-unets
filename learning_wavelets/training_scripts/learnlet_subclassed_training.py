@@ -51,8 +51,8 @@ def train_learnlet(
 
     # Read Saved Batches  
     with tf.device('/CPU:0'): 
-        x_train = np.load(data_dir+'x_train.npy')
-        y_train = np.load(data_dir+'y_train.npy')
+        x_train = np.load(data_dir+'x_train_gen.npy')
+        y_train = np.load(data_dir+'y_train_gen.npy')
 
     noise_sigma_orig = 0.0016
 
@@ -67,7 +67,7 @@ def train_learnlet(
     x_train /= norm_fact
 
     # Scale noisy sigma
-    noise_sigma_new = noise_sigma_orig / norm_fact
+    noise_sigma_new = noise_sigma_orig / norm_fact[:,:,0,0]
 
 
 
@@ -87,7 +87,7 @@ def train_learnlet(
     steps_per_epoch = np.shape(x_train)[0] // batch_size
 
 
-    n_epochs = 2 #500
+    n_epochs = 150
     undecimated_str = '' 
     if exact_reco:
         undecimated_str += '_exact_reco'

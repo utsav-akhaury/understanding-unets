@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=learnlet_256_500     # nom du job
+#SBATCH --job-name=learnlet_256     # nom du job
 #SBATCH --gpus 1
-#SBATCH --partition debug-gpu
-#SBATCH --mem 0
-#SBATCH --time=0-00:15:00              # temps d’exécution maximum demande (HH:MM:SS) 35
-#SBATCH --output=learnlet_256_500_%j.out # nom du fichier de sortie
-#SBATCH --error=learnlet_256_500_%j.out  # nom du fichier d'erreur (ici commun avec la sortie)
+#SBATCH --partition shared-gpu
+#SBATCH --mem=12000
+#SBATCH --time=0-12:00:00              # temps d’exécution maximum demande (HH:MM:SS)
+#SBATCH --output=learnlet_256_150_%j.out # nom du fichier de sortie
+#SBATCH --error=learnlet_256_150_%j.out  # nom du fichier d'erreur (ici commun avec la sortie)
 
 set -x
 cd $HOME/Thesis/understanding-unets
