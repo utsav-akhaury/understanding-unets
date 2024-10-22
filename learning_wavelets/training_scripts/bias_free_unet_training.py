@@ -37,8 +37,8 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_b
 
     # Read Saved Batches   
     with tf.device('/CPU:0'):
-        x_train = np.load(data_dir+'x_train_gen.npy')
-        y_train = np.load(data_dir+'y_train_gen.npy')
+        x_train = np.load(data_dir+'x_train.npy')
+        y_train = np.load(data_dir+'y_train.npy')
 
 
     # Normalize targets
