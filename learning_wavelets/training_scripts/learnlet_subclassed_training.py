@@ -51,8 +51,8 @@ def train_learnlet(
 
     # Read Saved Batches  
     with tf.device('/CPU:0'): 
-        x_train = np.load(data_dir+'x_train_gen.npy')
-        y_train = np.load(data_dir+'y_train_gen.npy')
+        x_train = np.load(data_dir+'x_train.npy')
+        y_train = np.load(data_dir+'y_train.npy')
 
     noise_sigma_orig = 0.0016
 
