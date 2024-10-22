@@ -43,12 +43,12 @@ def evaluate_Learnlet(noisy,
     model(inputs)
     model.load_weights(model_dir+f'Learnlet/Checkpoints/{run_id}-{n_epochs}.hdf5')
     
-    y_pred = np.zeros((noisy.shape))
+    x_pred = np.zeros((noisy.shape))
     for i in range(noisy.shape[0]):
-        y_pred[i] = model.predict([np.expand_dims(noisy[i], axis=0), 
+        x_pred[i] = model.predict([np.expand_dims(noisy[i], axis=0), 
                                    np.expand_dims(np.array(noise_std_test[i]), 0).reshape(-1,1)])
 
-    return y_pred
+    return x_pred
 
 
 def evaluate_unet(noisy,                           
@@ -75,11 +75,11 @@ def evaluate_unet(noisy,
 
     model.load_weights(model_dir+f'Unet/Checkpoints/{run_id}-{n_epochs}.hdf5')
      
-    y_pred = np.zeros((noisy.shape))
+    x_pred = np.zeros((noisy.shape))
     for i in range(noisy.shape[0]):
-        y_pred[i] = model.predict(np.expand_dims(noisy[i], axis=0))
+        x_pred[i] = model.predict(np.expand_dims(noisy[i], axis=0))
 
-    return y_pred
+    return x_pred
 
 
 
@@ -93,36 +93,36 @@ f.close()
 
 # Norm
 noise_sigma_orig = dico['noisemap']
-x_test = dico['inputs_tikho_laplacian']
-y_test = dico['targets']
+y_test = dico['inputs_tikho_laplacian']
+x_test = dico['targets']
 
 # Normalize targets
-y_test = y_test - np.mean(y_test, axis=(1,2), keepdims=True)
-norm_fact = np.max(y_test, axis=(1,2), keepdims=True) 
-y_test /= norm_fact
+x_test = x_test - np.mean(x_test, axis=(1,2), keepdims=True)
+norm_fact = np.max(x_test, axis=(1,2), keepdims=True) 
+x_test /= norm_fact
 
 # Normalize & scale tikho inputs
-x_test = x_test - np.mean(x_test, axis=(1,2), keepdims=True)
-x_test /= norm_fact
+y_test = y_test - np.mean(y_test, axis=(1,2), keepdims=True)
+y_test /= norm_fact
 
 # # Scale noisy sigma
 noise_sigma_new = noise_sigma_orig / norm_fact[:,:,0]
 
-res_learnlet = np.expand_dims(np.zeros((x_test.shape)), -1)
-res_unet = np.expand_dims(np.zeros((x_test.shape)), -1)
+res_learnlet = np.expand_dims(np.zeros((y_test.shape)), -1)
+res_unet = np.expand_dims(np.zeros((y_test.shape)), -1)
 
 
-for i in range(0, x_test.shape[0], 500):
+for i in range(0, y_test.shape[0], 500):
 
-    if i+500 > x_test.shape[0]:
-        ind = x_test.shape[0]
+    if i+500 > y_test.shape[0]:
+        ind = y_test.shape[0]
     else:
         ind = i+500
 
-    x = x_test[i:ind]
+    y = y_test[i:ind]
 
     # Learnlet
-    res_learnlet[i:ind] = evaluate_Learnlet(np.expand_dims(x, axis=-1), 
+    res_learnlet[i:ind] = evaluate_Learnlet(np.expand_dims(y, axis=-1), 
                                             noise_sigma_new,
                                             'l1_learnlet_subclassed_256__exact_reco_dynamic_soft_thresholding_1678995615-150.hdf5',
                                             150,
@@ -130,7 +130,7 @@ for i in range(0, x_test.shape[0], 500):
                                             5)
 
     # Unet
-    res_unet[i:ind] = evaluate_unet(np.expand_dims(x, axis=-1), 
+    res_unet[i:ind] = evaluate_unet(np.expand_dims(y, axis=-1), 
                                     'l1_unet_64_bias_free_1678979514',
                                     500,
                                     64)
