@@ -51,8 +51,8 @@ def train_learnlet(
 
     # Read Saved Batches  
     with tf.device('/CPU:0'): 
-        y_train = np.load(data_dir+'y_train.npy')
-        x_train = np.load(data_dir+'x_train.npy')
+        y_train = np.load(data_dir+'y_train.npy')        # input to the network (tikhonov deconvolution)   
+        x_train = np.load(data_dir+'x_train.npy')        # ground truth
 
     noise_sigma_orig = 0.0016
 
