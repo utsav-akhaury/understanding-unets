@@ -37,21 +37,21 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_b
 
     # Read Saved Batches   
     with tf.device('/CPU:0'):
-        x_train = np.load(data_dir+'x_train.npy')
-        y_train = np.load(data_dir+'y_train.npy')
+        y_train = np.load(data_dir+'y_train.npy')    # input to the network (tikhonov deconvolution)
+        x_train = np.load(data_dir+'x_train.npy')    # ground truth
 
 
     # Normalize targets
-    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
-    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
-    y_train /= norm_fact
-
-    # Normalize & scale tikho inputs
     x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(x_train, axis=(1,2), keepdims=True) 
     x_train /= norm_fact
 
+    # Normalize & scale tikho inputs
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    y_train /= norm_fact
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+
+    noisy_ds = tf.data.Dataset.from_tensor_slices((y_train, x_train))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset_unet,
@@ -64,7 +64,7 @@ def train_unet(cuda_visible_devices='0123', base_n_filters=64, n_layers=5, use_b
 
 
 
-    steps_per_epoch = np.shape(x_train)[0] // batch_size
+    steps_per_epoch = np.shape(y_train)[0] // batch_size
 
 
     n_epochs = 500
@@ -141,27 +141,27 @@ def train_old_unet(cuda_visible_devices='0123',
 
     # Read Saved Batches   
     with tf.device('/CPU:0'):
-        x_train = np.load(data_dir+'x_train.npy')
         y_train = np.load(data_dir+'y_train.npy')
+        x_train = np.load(data_dir+'x_train.npy')
 
     # noise_sigma_orig = 0.0016
 
 
     # Normalize targets
-    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
-    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
-    y_train /= norm_fact
+    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(x_train, axis=(1,2), keepdims=True) 
+    x_train /= norm_fact
 
     # Normalize & scale tikho inputs
-    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
-    x_train /= norm_fact
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    y_train /= norm_fact
 
     # # Scale noisy sigma
     # noise_sigma_new = noise_sigma_orig / norm_fact[:,:,0,0]
 
 
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    noisy_ds = tf.data.Dataset.from_tensor_slices((y_train, x_train))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset_unet,
@@ -174,7 +174,7 @@ def train_old_unet(cuda_visible_devices='0123',
 
 
 
-    steps_per_epoch = np.shape(x_train)[0] // batch_size
+    steps_per_epoch = np.shape(y_train)[0] // batch_size
 
 
     n_epochs = 500
