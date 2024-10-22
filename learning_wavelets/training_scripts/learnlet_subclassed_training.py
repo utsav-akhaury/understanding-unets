@@ -51,27 +51,27 @@ def train_learnlet(
 
     # Read Saved Batches  
     with tf.device('/CPU:0'): 
-        x_train = np.load(data_dir+'x_train.npy')
         y_train = np.load(data_dir+'y_train.npy')
+        x_train = np.load(data_dir+'x_train.npy')
 
     noise_sigma_orig = 0.0016
 
 
     # Normalize targets
-    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
-    norm_fact = np.max(y_train, axis=(1,2), keepdims=True) 
-    y_train /= norm_fact
+    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
+    norm_fact = np.max(x_train, axis=(1,2), keepdims=True) 
+    x_train /= norm_fact
 
     # Normalize & scale tikho inputs
-    x_train = x_train - np.mean(x_train, axis=(1,2), keepdims=True)
-    x_train /= norm_fact
+    y_train = y_train - np.mean(y_train, axis=(1,2), keepdims=True)
+    y_train /= norm_fact
 
     # Scale noisy sigma
     noise_sigma_new = noise_sigma_orig / norm_fact[:,:,0,0]
 
 
 
-    noisy_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train, noise_sigma_new))
+    noisy_ds = tf.data.Dataset.from_tensor_slices((y_train, x_train, noise_sigma_new))
 
     train_noisy_ds = noisy_ds.map(
         transform_dataset,
@@ -84,7 +84,7 @@ def train_learnlet(
 
 
 
-    steps_per_epoch = np.shape(x_train)[0] // batch_size
+    steps_per_epoch = np.shape(y_train)[0] // batch_size
 
 
     n_epochs = 150
